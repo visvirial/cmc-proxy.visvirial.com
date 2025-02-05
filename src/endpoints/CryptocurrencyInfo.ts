@@ -9,6 +9,9 @@ import { Context } from 'hono';
 import {
 	CryptocurrencyInfoRequest,
 } from '../types';
+import {
+	getResponseStatus,
+} from '../util';
 import { CoinMarketCap } from 'CoinMarketCap';
 
 export class CryptocurrencyInfo extends OpenAPIRoute {
@@ -32,9 +35,10 @@ export class CryptocurrencyInfo extends OpenAPIRoute {
 	};
 	
 	async handle(c: Context) {
+		const start = Date.now();
 		const data = await this.getValidatedData<typeof this.schema>();
 		const cmc = new CoinMarketCap(c.env);
-		const { data: metadata } = await cmc.getMetadataAll();
+		const { time, data: metadata } = await cmc.getMetadataAll();
 		const respond = (name: string, key: string) => {
 			const result: { [id: string]: any } = {};
 			const keys = key.split(',');
@@ -43,9 +47,14 @@ export class CryptocurrencyInfo extends OpenAPIRoute {
 				if(meta) {
 					result[meta.id] = meta;
 				} else if(!data.query.skip_invalild) {
+					c.status(400);
 					return {
-						success: false,
-						message: `Invalid ${name}: ${k}`,
+						status: getResponseStatus(
+							Date.now(),
+							Date.now() - start,
+							400,
+							`Invalid ${name}: ${k}`,
+						),
 					};
 				}
 			});
@@ -77,8 +86,11 @@ export class CryptocurrencyInfo extends OpenAPIRoute {
 				}
 			}
 			return {
-				success: true,
 				data: result,
+				status: getResponseStatus(
+					time,
+					Date.now() - start,
+				),
 			};
 		};
 		if(data.query.id) {
@@ -94,8 +106,12 @@ export class CryptocurrencyInfo extends OpenAPIRoute {
 			return respond('address', data.query.address);
 		}
 		return {
-			success: false,
-			message: 'At least one of id, slug, symbol, or address must be provided.',
+			status: getResponseStatus(
+				Date.now(),
+				Date.now() - start,
+				400,
+				'At least one of id, slug, symbol, or address must be provided.',
+			),
 		};
 	}
 	

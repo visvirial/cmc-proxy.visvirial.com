@@ -9,6 +9,9 @@ import { Context } from 'hono';
 import {
 	CryptocurrencyMapRequest,
 } from '../types';
+import {
+	getResponseStatus,
+} from '../util';
 import { CoinMarketCap } from 'CoinMarketCap';
 
 export class CryptocurrencyMap extends OpenAPIRoute {
@@ -34,7 +37,7 @@ export class CryptocurrencyMap extends OpenAPIRoute {
 	async handle(c: Context) {
 		const data = await this.getValidatedData<typeof this.schema>();
 		const cmc = new CoinMarketCap(c.env);
-		let { data: map } = await cmc.getMapAll(data.query.listing_status);
+		let { time, data: map } = await cmc.getMapAll(data.query.listing_status);
 		// Sort.
 		if(data.query.sort === 'id') {
 			map.sort((a, b) => a.id - b.id);
@@ -68,8 +71,11 @@ export class CryptocurrencyMap extends OpenAPIRoute {
 			}
 		}
 		return {
-			success: true,
 			data: map,
+			status: getResponseStatus(
+				time,
+				Date.now() - start,
+			),
 		};
 	}
 	
