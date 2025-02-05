@@ -35,6 +35,7 @@ export class CryptocurrencyMap extends OpenAPIRoute {
 	};
 	
 	async handle(c: Context) {
+		const start = Date.now();
 		const data = await this.getValidatedData<typeof this.schema>();
 		const cmc = new CoinMarketCap(c.env);
 		let { time, data: map } = await cmc.getMapAll(data.query.listing_status);
