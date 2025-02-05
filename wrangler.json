@@ -15,7 +15,12 @@
       "binding": "COINMARKETCAP_PROXY",
       "id": "3a365dcd3fc045489fc9017ceb4e725c"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
+  },
   /**
    * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

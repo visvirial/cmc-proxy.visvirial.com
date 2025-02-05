@@ -1,35 +1,35 @@
 
 import { Context } from 'hono';
-import { env } from 'hono/adapter'
+
+export interface CacheEntry {
+	time: number;
+	data: any;
+}
 
 export class CoinMarketCap {
 	
 	constructor(
-		public readonly c: Context,
+		public readonly env: any,
 		public readonly endpointUrl = 'https://pro-api.coinmarketcap.com',
 	) {
 	}
 	
-	private async _getCached(kvKey: string, expire: number, fetchFunc: () => Promise<any>) {
-		// Try to fetch from KV.
-		const json = await this.c.env.COINMARKETCAP_PROXY.get(kvKey);
-		if(json !== null) {
-			const data = JSON.parse(json);
-			if(data.time > Date.now() - expire) {
-				return data.data;
-			}
-		}
-		// Fetch.
-		const data = await fetchFunc();
-		// Save to KV.
-		await this.c.env.COINMARKETCAP_PROXY.put(kvKey, JSON.stringify({
+	private async _setCache(key: string, data: any) {
+		await this.env.COINMARKETCAP_PROXY.put(key, JSON.stringify({
 			time: Date.now(),
 			data,
 		}));
-		return data;
 	}
 	
-	private async _getMapAll(listing_status = 'active') {
+	private async _getCache(key: string): Promise<null | CacheEntry> {
+		const json = await this.env.COINMARKETCAP_PROXY.get(key);
+		if(json === null) {
+			return null;
+		}
+		return JSON.parse(json);
+	}
+	
+	private async _fetchMapAll(listing_status = 'active') {
 		const map = [];
 		const limit = 5000;
 		for(let start=1; ; start+=limit) {
@@ -47,14 +47,19 @@ export class CoinMarketCap {
 		return map;
 	}
 	
+	public async refreshMapAll(listing_status = 'active') {
+		const map = await this._fetchMapAll(listing_status);
+		await this._setCache(`mapAll:${listing_status}`, map);
+	}
+	
 	public async getMapAll(listing_status = 'active') {
-		return await this._getCached(`mapAll:${listing_status}`, 60 * 60 * 1000, () => this._getMapAll(listing_status));
+		return await this._getCache(`mapAll:${listing_status}`);
 	}
 	
 	private async _getMetadataAll() {
 		// Get all IDs.
 		const map = await this.getMapAll();
-		const ids = map.map((item) => item.id);
+		const ids = map.data.map((item: any) => item.id);
 		// Fetch metadata.
 		let metadata = {};
 		const batchSize = 500;
@@ -68,12 +73,18 @@ export class CoinMarketCap {
 		return metadata;
 	}
 	
+	public async refreshMetadataAll() {
+		const metadata = await this._getMetadataAll();
+		await this._setCache('metadataAll', metadata);
+	}
+	
 	public async getMetadataAll() {
-		return await this._getCached('metadataAll', 60 * 60 * 1000, () => this._getMetadataAll());
+		return this._getCache('metadataAll');
 	}
 	
 	public async fetch(path: string, params: any = {}): Promise<any> {
-		const { CMC_API_KEY } = env<{ CMC_API_KEY: string }>(this.c);
+		//const { CMC_API_KEY } = env<{ CMC_API_KEY: string }>(this.c);
+		const CMC_API_KEY = this.env.CMC_API_KEY;
 		const query = new URLSearchParams(params);
 		const url = `${this.endpointUrl}${path}?${query.toString()}`;
 		const response = await fetch(url, {

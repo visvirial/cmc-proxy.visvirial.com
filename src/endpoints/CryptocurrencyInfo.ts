@@ -33,8 +33,8 @@ export class CryptocurrencyInfo extends OpenAPIRoute {
 	
 	async handle(c: Context) {
 		const data = await this.getValidatedData<typeof this.schema>();
-		const cmc = new CoinMarketCap(c);
-		const metadata = await cmc.getMetadataAll();
+		const cmc = new CoinMarketCap(c.env);
+		const { data: metadata } = await cmc.getMetadataAll();
 		const respond = (name: string, key: string) => {
 			const result: { [id: string]: any } = {};
 			const keys = key.split(',');
